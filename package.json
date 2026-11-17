@@ -1,0 +1,24 @@
+{
+  "name": "pi-session-title",
+  "version": "0.1.0",
+  "description": "Pi extension that auto-names sessions from what you're working on, so the terminal tab title stays meaningful",
+  "keywords": ["pi-package", "pi-extension", "pi", "terminal-title", "session-name"],
+  "license": "MIT",
+  "author": "Antonio Vivace",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/avivace/pi-session-title.git"
+  },
+  "type": "module",
+  "files": ["extensions", "README.md", "CHANGELOG.md", "LICENSE"],
+  "pi": {
+    "extensions": ["./extensions/session-title.ts"]
+  },
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/*.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
