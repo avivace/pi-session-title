@@ -1,7 +1,7 @@
 {
-  "name": "pi-session-title",
+  "name": "pi-live-title",
   "version": "0.1.0",
-  "description": "Pi extension that auto-names sessions from what you're working on, so the terminal tab title stays meaningful",
+  "description": "Pi extension that keeps the session name, and so the terminal tab title, in sync with what you are working on",
   "keywords": ["pi-package", "pi-extension", "pi", "terminal-title", "session-name"],
   "license": "MIT",
   "author": "Antonio Vivace",
@@ -12,7 +12,7 @@
   "type": "module",
   "files": ["extensions", "README.md", "CHANGELOG.md", "LICENSE"],
   "pi": {
-    "extensions": ["./extensions/session-title.ts"]
+    "extensions": ["./extensions/live-title.ts"]
   },
   "scripts": {
     "test": "node --test --experimental-strip-types test/*.test.ts"

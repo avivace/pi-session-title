@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { cleanTitle } from "../extensions/session-title.ts";
+import { cleanTitle } from "../extensions/live-title.ts";
 
 test("strips quotes, prefixes and trailing punctuation", () => {
 	assert.equal(cleanTitle('"Fix license scan CI."'), "Fix license scan CI");

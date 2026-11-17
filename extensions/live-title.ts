@@ -1,5 +1,5 @@
 /**
- * pi-session-title: keeps the session name (and so the terminal tab title,
+ * pi-live-title: keeps the session name (and so the terminal tab title,
  * which pi renders as `pi - <name> - <cwd>`) in sync with what the session
  * is about, using a short LLM summary.
  */
@@ -7,7 +7,8 @@
 import type { Api, Model, UserMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
-const ENTRY_TYPE = "session-title";
+const ENTRY_TYPE = "live-title";
+const USAGE_ENTRY_TYPE = "live-title-usage";
 const DEFAULT_EVERY = 5;
 const MAX_WORDS = 6;
 const MAX_TITLE_CHARS = 48;
@@ -25,13 +26,20 @@ interface Config {
 	model?: string;
 }
 
+interface UsageEntryData {
+	model: string;
+	input: number;
+	output: number;
+	cost: number;
+}
+
 interface TitleEntryData {
 	name: string;
 	locked?: boolean;
 }
 
 function readConfig(pi: ExtensionAPI): Config {
-	const raw = ((pi.getSettings() as Record<string, unknown>).sessionTitle ?? {}) as Partial<Config>;
+	const raw = ((pi.getSettings() as Record<string, unknown>).liveTitle ?? {}) as Partial<Config>;
 	const every = Number(raw.every);
 	return {
 		enabled: raw.enabled !== false,
@@ -70,16 +78,19 @@ export default function (pi: ExtensionAPI) {
 	let locked = false;
 	let inFlight = false;
 	let ourName: string | undefined;
+	let stats = { calls: 0, input: 0, output: 0, cost: 0 };
 
 	function restore(ctx: ExtensionContext) {
 		promptsSinceTitle = 0;
 		inFlight = false;
 		ourName = undefined;
+		stats = { calls: 0, input: 0, output: 0, cost: 0 };
 		let last: TitleEntryData | undefined;
 		for (const e of ctx.sessionManager.getEntries()) {
-			if (e.type === "custom" && (e as { customType?: string }).customType === ENTRY_TYPE) {
-				last = (e as { data?: TitleEntryData }).data;
-			}
+			if (e.type !== "custom") continue;
+			const { customType, data } = e as { customType?: string; data?: unknown };
+			if (customType === ENTRY_TYPE) last = data as TitleEntryData;
+			if (customType === USAGE_ENTRY_TYPE && data) addStats(data as UsageEntryData);
 		}
 		const current = ctx.sessionManager.getSessionName();
 		hasAutoTitle = !!last && !last.locked && last.name === current;
@@ -136,8 +147,25 @@ export default function (pi: ExtensionAPI) {
 			{ maxTokens: 64, signal },
 		);
 		const result = await stream.result();
+		if (result.usage) {
+			const u: UsageEntryData = {
+				model: `${model.provider}/${model.id}`,
+				input: result.usage.input + result.usage.cacheRead + result.usage.cacheWrite,
+				output: result.usage.output,
+				cost: result.usage.cost?.total ?? 0,
+			};
+			addStats(u);
+			pi.appendEntry<UsageEntryData>(USAGE_ENTRY_TYPE, u);
+		}
 		if (result.stopReason === "error" || result.stopReason === "aborted") return undefined;
 		return cleanTitle(textOf(result.content));
+	}
+
+	function addStats(u: UsageEntryData) {
+		stats.calls++;
+		stats.input += u.input || 0;
+		stats.output += u.output || 0;
+		stats.cost += u.cost || 0;
 	}
 
 	function apply(name: string, lock: boolean) {
@@ -185,9 +213,17 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("title", {
-		description: "Session title: /title (regenerate), /title <text> (set and lock), /title auto (unlock)",
+		description: "Session title: /title (regenerate), /title <text> (set and lock), /title auto (unlock), /title stats (token cost)",
 		handler: async (args, ctx) => {
 			const arg = args.trim();
+			if (arg === "stats") {
+				const avg = stats.calls ? Math.round(stats.input / stats.calls) : 0;
+				ctx.ui.notify(
+					`Session title: ${stats.calls} calls, ${stats.input} in / ${stats.output} out tokens (avg ${avg} in), $${stats.cost.toFixed(4)}`,
+					"info",
+				);
+				return;
+			}
 			if (arg === "auto") {
 				locked = false;
 				hasAutoTitle = false;
